@@ -19,8 +19,13 @@ sequential(Cycles, F) ->
 	perftest("Sequential", Cycles,
 		fun () -> executeMultipleTimes(Cycles, F) end).
 
+-ifdef(time_correction).
+sequentialTimings(Cycles, F) ->
+	[ begin S = os:timestamp(), F(), E = os:timestamp(), timer:now_diff(E, S) end || _ <- lists:seq(1, Cycles) ].
+-else.
 sequentialTimings(Cycles, F) ->
 	[ begin S = now(), F(), E = now(), timer:now_diff(E, S) end || _ <- lists:seq(1, Cycles) ].
+-endif.
 
 parallel(Parallel, Cycles, F) ->
 	perftest("Parallel " ++ integer_to_list(Parallel), Cycles, fun () ->
@@ -35,6 +40,19 @@ parallel(Parallel, Cycles, F) ->
 		collectMessages(Parallel, finished)
 	end).
 
+
+-ifdef(time_correction).
+perftest(Name, Cycles, F) ->
+	{_, StartSecs, StartMS} = os:timestamp(),
+	F(),
+	{_, StopSecs, StopMS} = os:timestamp(),
+	MS = (StopSecs * 1000 + StopMS / 1000)
+		- (StartSecs * 1000 + StartMS / 1000),
+	CPS = round(1000 * Cycles / MS),
+	io:format("~s ~p cycles in ~~~p seconds (~p cycles/s)~n",
+		[Name, Cycles, round(MS / 1000), CPS]),
+	CPS.
+-else.
 perftest(Name, Cycles, F) ->
 	{_, StartSecs, StartMS} = now(),
 	F(),
@@ -45,6 +63,8 @@ perftest(Name, Cycles, F) ->
 	io:format("~s ~p cycles in ~~~p seconds (~p cycles/s)~n",
 		[Name, Cycles, round(MS / 1000), CPS]),
 	CPS.
+-endif.
+
 
 executeMultipleTimes(0, _F) -> ok;
 executeMultipleTimes(N, F) -> F(), executeMultipleTimes(N - 1, F).
